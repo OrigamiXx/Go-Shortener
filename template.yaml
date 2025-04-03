@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: provided.al2
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        BASE_URL: !Sub "https://${ApiDomainName}"
+
+Resources:
+  CreateURLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: create
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: url-shortener
+      Events:
+        CreateURL:
+          Type: Api
+          Properties:
+            Path: /create
+            Method: post
+            RequestParameters:
+              method.request.header.Content-Type: true
+
+  RedirectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: redirect
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: url-shortener
+      Events:
+        Redirect:
+          Type: Api
+          Properties:
+            Path: /{shortCode}
+            Method: get
+            RequestParameters:
+              method.request.path.shortCode: true
+
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  ApiDomainName:
+    Description: API Gateway domain name
+    Value: !Sub "${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com" 
