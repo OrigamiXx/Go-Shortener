@@ -42,13 +42,26 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
    go mod download
    ```
 
-2. Create DynamoDB table:
+2. Create DynamoDB tables:
    ```bash
+   # Create URL shortener table
    aws dynamodb create-table \
      --table-name url-shortener \
      --attribute-definitions AttributeName=ShortCode,AttributeType=S \
      --key-schema AttributeName=ShortCode,KeyType=HASH \
      --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+
+   # Create counter table for generating short codes
+   aws dynamodb create-table \
+     --table-name url-counter \
+     --attribute-definitions AttributeName=CounterName,AttributeType=S \
+     --key-schema AttributeName=CounterName,KeyType=HASH \
+     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+
+   # Initialize the counter
+   aws dynamodb put-item \
+     --table-name url-counter \
+     --item '{"CounterName": {"S": "url_counter"}, "CurrentValue": {"N": "0"}}'
    ```
 
 3. Deploy Lambda functions:
@@ -175,28 +188,12 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
   - Replace UUID-based generation with a more compact algorithm
   - Consider using base62 encoding for shorter URLs
   - Implement custom length configuration
-- [ ] Add URL analytics:
-  - Track click counts
-  - Store user agent information
-  - Track referrers
 - [ ] Implement URL expiration:
   - Add TTL support in DynamoDB
   - Allow setting custom expiration times
 - [ ] Add rate limiting:
   - Implement API Gateway throttling
   - Add per-user rate limits
-- [ ] Enhance security:
-  - Add API key authentication
-  - Implement URL validation against malicious sites
-  - Add CORS configuration options
-- [ ] Add monitoring:
-  - Set up CloudWatch alarms
-  - Add request tracing
-  - Implement error reporting
-- [ ] Improve testing:
-  - Add integration tests
-  - Add load testing scripts
-  - Implement CI/CD pipeline
 
 ## License
 

@@ -18,6 +18,7 @@ import (
 var (
 	shortenerService *shortener.Shortener
 	urlStorage      *storage.DynamoDBStorage
+	counterStorage  *storage.CounterStorage
 )
 
 func init() {
@@ -30,13 +31,14 @@ func init() {
 	// Initialize DynamoDB client
 	dynamoClient := dynamodb.NewFromConfig(cfg)
 	urlStorage = storage.NewDynamoDBStorage(dynamoClient)
+	counterStorage = storage.NewCounterStorage(dynamoClient)
 
 	// Initialize shortener service
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "https://your-domain.com" // Replace with your actual domain
 	}
-	shortenerService = shortener.NewShortener(baseURL)
+	shortenerService = shortener.NewShortener(baseURL, counterStorage)
 }
 
 func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -50,7 +52,7 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	// Create short URL
-	url, err := shortenerService.CreateShortURL(req.URL)
+	url, err := shortenerService.CreateShortURL(ctx, req.URL)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
