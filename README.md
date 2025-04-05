@@ -169,6 +169,35 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
    sam local start-api
    ```
 
+## TODO
+
+- [ ] Improve short URL generation:
+  - Replace UUID-based generation with a more compact algorithm
+  - Consider using base62 encoding for shorter URLs
+  - Implement custom length configuration
+- [ ] Add URL analytics:
+  - Track click counts
+  - Store user agent information
+  - Track referrers
+- [ ] Implement URL expiration:
+  - Add TTL support in DynamoDB
+  - Allow setting custom expiration times
+- [ ] Add rate limiting:
+  - Implement API Gateway throttling
+  - Add per-user rate limits
+- [ ] Enhance security:
+  - Add API key authentication
+  - Implement URL validation against malicious sites
+  - Add CORS configuration options
+- [ ] Add monitoring:
+  - Set up CloudWatch alarms
+  - Add request tracing
+  - Implement error reporting
+- [ ] Improve testing:
+  - Add integration tests
+  - Add load testing scripts
+  - Implement CI/CD pipeline
+
 ## License
 
 MIT License 
