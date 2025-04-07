@@ -249,16 +249,104 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 
 ## TODO
 
-- [ ] Improve short URL generation:
-  - Replace UUID-based generation with a more compact algorithm
-  - Consider using base62 encoding for shorter URLs
-  - Implement custom length configuration
-- [ ] Implement URL expiration:
-  - Add TTL support in DynamoDB
-  - Allow setting custom expiration times
-- [ ] Add rate limiting:
-  - Implement API Gateway throttling
-  - Add per-user rate limits
+- [x] Improve short URL generation:
+  - [x] Replace UUID-based generation with a more compact algorithm
+  - [x] Consider using base62 encoding for shorter URLs
+  - [x] Implement custom length configuration
+- [x] Implement URL expiration:
+  - [x] Add TTL support in DynamoDB
+  - [x] Allow setting custom expiration times
+- [x] Add rate limiting:
+  - [x] Implement API Gateway throttling
+  - [x] Add per-user rate limits
+- [ ] Infrastructure as Code:
+  - [ ] Create Terraform configuration
+  - [ ] Define DynamoDB tables and auto-scaling
+  - [ ] Set up Lambda functions and API Gateway
+  - [ ] Configure IAM roles and policies
+  - [ ] Implement monitoring and alerting
+
+## Infrastructure as Code with Terraform
+
+### Planned Terraform Structure
+
+```
+terraform/
+├── main.tf           # Main Terraform configuration
+├── variables.tf      # Input variables
+├── outputs.tf        # Output values
+├── providers.tf      # Provider configuration
+├── dynamodb.tf       # DynamoDB tables and auto-scaling
+├── lambda.tf         # Lambda functions
+├── api_gateway.tf    # API Gateway configuration
+├── iam.tf           # IAM roles and policies
+├── monitoring.tf    # CloudWatch alarms and metrics
+└── terraform.tfvars # Variable values
+```
+
+### Key Infrastructure Components
+
+1. **DynamoDB Tables**
+   - URL shortener table with auto-scaling
+   - Counter table with auto-scaling
+   - TTL configuration
+   - Backup and restore policies
+
+2. **Lambda Functions**
+   - Create URL function
+   - Redirect function
+   - Environment variables
+   - VPC configuration (if needed)
+
+3. **API Gateway**
+   - REST API configuration
+   - Custom domain name
+   - API key management
+   - Throttling settings
+
+4. **IAM Roles and Policies**
+   - Lambda execution role
+   - DynamoDB access policies
+   - CloudWatch logging permissions
+   - API Gateway permissions
+
+5. **Monitoring and Alerting**
+   - CloudWatch alarms
+   - Custom metrics
+   - Error rate monitoring
+   - Capacity utilization alerts
+
+### Deployment Process
+
+1. Initialize Terraform:
+   ```bash
+   cd terraform
+   terraform init
+   ```
+
+2. Plan the changes:
+   ```bash
+   terraform plan -out=tfplan
+   ```
+
+3. Apply the configuration:
+   ```bash
+   terraform apply tfplan
+   ```
+
+4. Destroy resources (when needed):
+   ```bash
+   terraform destroy
+   ```
+
+### Benefits of Terraform
+
+- Version controlled infrastructure
+- Consistent deployments
+- Easy environment replication
+- Automated scaling configuration
+- Cost optimization through resource management
+- Disaster recovery planning
 
 ## License
 
