@@ -7,7 +7,7 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 ## Features
 
 - Serverless architecture using AWS Lambda
-- DynamoDB for data storage
+- DynamoDB for data storage with auto-scaling
 - RESTful API endpoints
 - Automatic URL validation
 - Unique short code generation
@@ -20,6 +20,7 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 - AWS SAM CLI (for local development)
 - Docker (for local DynamoDB and containerized deployment)
 - Docker Compose (for local development)
+- AWS Application Auto Scaling permissions
 
 ## Project Structure
 
@@ -35,6 +36,7 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 ├── pkg/
 │   └── shortener/    # URL shortener logic
 ├── scripts/          # Deployment and utility scripts
+│   └── setup_autoscaling.sh  # DynamoDB auto-scaling setup
 ├── Dockerfile        # Docker build instructions
 ├── docker-compose.yml # Docker Compose configuration
 └── .dockerignore     # Docker ignore file
