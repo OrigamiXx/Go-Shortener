@@ -5,7 +5,9 @@ import (
 	"encoding/base62"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jingy/Go-Shortener/internal/models"
 	"github.com/jingy/Go-Shortener/internal/storage"
@@ -27,7 +29,7 @@ func NewShortener(baseURL string, counter *storage.CounterStorage) *Shortener {
 	}
 }
 
-// GenerateShortCode generates a unique short code using a counter
+// GenerateShortCode generates a unique short code using a counter within the current day bucket
 func (s *Shortener) GenerateShortCode(ctx context.Context) (string, error) {
 	// Get next counter value
 	counter, err := s.counter.GetNextCounter(ctx)
@@ -35,8 +37,17 @@ func (s *Shortener) GenerateShortCode(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get counter: %w", err)
 	}
 
-	// Convert counter to base62 string
-	shortCode := base62.Encode(uint64(counter))
+	// Get current timestamp (seconds since epoch)
+	timestamp := time.Now().UTC().Unix()
+	
+	// Combine timestamp and counter to create a unique value
+	// We use the last 6 digits of the timestamp (to keep it manageable)
+	// and combine it with the counter value
+	timestampLast6 := timestamp % 1000000 // Last 6 digits of timestamp
+	combinedValue := timestampLast6*1000 + counter // Combine with counter (assuming counter < 1000)
+	
+	// Convert to base62 string
+	shortCode := base62.Encode(uint64(combinedValue))
 	
 	// Pad with leading zeros if needed
 	if len(shortCode) < shortCodeLength {

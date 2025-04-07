@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -12,13 +13,26 @@ import (
 // MockDynamoDBClient is a mock implementation of the DynamoDB client
 type MockDynamoDBClient struct {
 	UpdateItemFunc func(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	ScanFunc       func(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+	DeleteItemFunc func(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
 }
 
 func (m *MockDynamoDBClient) UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	return m.UpdateItemFunc(ctx, params, optFns...)
 }
 
+func (m *MockDynamoDBClient) Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error) {
+	return m.ScanFunc(ctx, params, optFns...)
+}
+
+func (m *MockDynamoDBClient) DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
+	return m.DeleteItemFunc(ctx, params, optFns...)
+}
+
 func TestCounterStorage_GetNextCounter(t *testing.T) {
+	// Get current bucket key
+	currentBucket := time.Now().UTC().Format("2006-01-02")
+	
 	tests := []struct {
 		name           string
 		mockUpdateItem func(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
@@ -28,9 +42,14 @@ func TestCounterStorage_GetNextCounter(t *testing.T) {
 		{
 			name: "successful increment",
 			mockUpdateItem: func(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+				// Verify the bucket key is correct
+				if params.Key["BucketKey"].(*types.AttributeValueMemberS).Value != currentBucket {
+					t.Errorf("Expected bucket key %s, got %s", currentBucket, params.Key["BucketKey"].(*types.AttributeValueMemberS).Value)
+				}
+				
 				return &dynamodb.UpdateItemOutput{
 					Attributes: map[string]types.AttributeValue{
-						"CurrentValue": &types.AttributeValueMemberN{Value: "42"},
+						"CounterValue": &types.AttributeValueMemberN{Value: "42"},
 					},
 				}, nil
 			},
@@ -42,7 +61,7 @@ func TestCounterStorage_GetNextCounter(t *testing.T) {
 			mockUpdateItem: func(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 				return &dynamodb.UpdateItemOutput{
 					Attributes: map[string]types.AttributeValue{
-						"CurrentValue": &types.AttributeValueMemberN{Value: "1"},
+						"CounterValue": &types.AttributeValueMemberN{Value: "1"},
 					},
 				}, nil
 			},
@@ -90,14 +109,23 @@ func TestCounterStorage_GetNextCounter_Concurrent(t *testing.T) {
 	// This test verifies that the counter is thread-safe by simulating concurrent access
 	
 	// Create a counter that returns sequential values
-	currentValue := int64(0)
+	currentBucket := time.Now().UTC().Format("2006-01-02")
+	counters := make(map[string]int64)
+	
 	mockClient := &MockDynamoDBClient{
 		UpdateItemFunc: func(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+			bucketKey := params.Key["BucketKey"].(*types.AttributeValueMemberS).Value
+			
+			// Verify we're using the current bucket
+			if bucketKey != currentBucket {
+				t.Errorf("Expected bucket key %s, got %s", currentBucket, bucketKey)
+			}
+			
 			// Simulate atomic increment
-			currentValue++
+			counters[bucketKey]++
 			return &dynamodb.UpdateItemOutput{
 				Attributes: map[string]types.AttributeValue{
-					"CurrentValue": &types.AttributeValueMemberN{Value: aws.String(currentValue)},
+					"CounterValue": &types.AttributeValueMemberN{Value: aws.String(counters[bucketKey])},
 				},
 			}, nil
 		},
@@ -146,5 +174,104 @@ func TestCounterStorage_GetNextCounter_Concurrent(t *testing.T) {
 		if value < 1 || value > int64(expectedCount) {
 			t.Errorf("Value %d is outside the expected range [1, %d]", value, expectedCount)
 		}
+	}
+}
+
+func TestCounterStorage_CleanupOldBuckets(t *testing.T) {
+	tests := []struct {
+		name           string
+		daysToKeep     int
+		mockScan       func(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+		mockDeleteItem func(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+		expectError    bool
+	}{
+		{
+			name:       "successful cleanup",
+			daysToKeep: 7,
+			mockScan: func(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error) {
+				// Create some test items with different dates
+				now := time.Now().UTC()
+				oldDate := now.AddDate(0, 0, -10).Format("2006-01-02")
+				recentDate := now.AddDate(0, 0, -5).Format("2006-01-02")
+				today := now.Format("2006-01-02")
+				
+				return &dynamodb.ScanOutput{
+					Items: []map[string]types.AttributeValue{
+						{
+							"BucketKey": &types.AttributeValueMemberS{Value: oldDate},
+						},
+						{
+							"BucketKey": &types.AttributeValueMemberS{Value: recentDate},
+						},
+						{
+							"BucketKey": &types.AttributeValueMemberS{Value: today},
+						},
+					},
+				}, nil
+			},
+			mockDeleteItem: func(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
+				// Verify we're only deleting old buckets
+				bucketKey := params.Key["BucketKey"].(*types.AttributeValueMemberS).Value
+				bucketDate, _ := time.Parse("2006-01-02", bucketKey)
+				cutoffDate := time.Now().UTC().AddDate(0, 0, -7)
+				
+				if !bucketDate.Before(cutoffDate) {
+					t.Errorf("Attempting to delete recent bucket: %s", bucketKey)
+				}
+				
+				return &dynamodb.DeleteItemOutput{}, nil
+			},
+			expectError: false,
+		},
+		{
+			name:       "scan error",
+			daysToKeep: 7,
+			mockScan: func(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error) {
+				return nil, aws.NewError("InternalServerError")
+			},
+			mockDeleteItem: nil,
+			expectError:    true,
+		},
+		{
+			name:       "delete error",
+			daysToKeep: 7,
+			mockScan: func(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error) {
+				now := time.Now().UTC()
+				oldDate := now.AddDate(0, 0, -10).Format("2006-01-02")
+				
+				return &dynamodb.ScanOutput{
+					Items: []map[string]types.AttributeValue{
+						{
+							"BucketKey": &types.AttributeValueMemberS{Value: oldDate},
+						},
+					},
+				}, nil
+			},
+			mockDeleteItem: func(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
+				return nil, aws.NewError("InternalServerError")
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock client
+			mockClient := &MockDynamoDBClient{
+				ScanFunc:       tt.mockScan,
+				DeleteItemFunc: tt.mockDeleteItem,
+			}
+
+			// Create counter storage with mock client
+			counterStorage := NewCounterStorage(mockClient)
+
+			// Call CleanupOldBuckets
+			err := counterStorage.CleanupOldBuckets(context.Background(), tt.daysToKeep)
+
+			// Check error
+			if (err != nil) != tt.expectError {
+				t.Errorf("CleanupOldBuckets() error = %v, expectError %v", err, tt.expectError)
+			}
+		})
 	}
 } 
