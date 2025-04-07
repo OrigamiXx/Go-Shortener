@@ -11,13 +11,15 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 - RESTful API endpoints
 - Automatic URL validation
 - Unique short code generation
+- Docker support for containerized deployment
 
 ## Prerequisites
 
 - Go 1.21 or later
 - AWS CLI configured with appropriate credentials
 - AWS SAM CLI (for local development)
-- Docker (for local DynamoDB)
+- Docker (for local DynamoDB and containerized deployment)
+- Docker Compose (for local development)
 
 ## Project Structure
 
@@ -32,8 +34,69 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 │   └── storage/      # DynamoDB storage implementation
 ├── pkg/
 │   └── shortener/    # URL shortener logic
-└── scripts/          # Deployment and utility scripts
+├── scripts/          # Deployment and utility scripts
+├── Dockerfile        # Docker build instructions
+├── docker-compose.yml # Docker Compose configuration
+└── .dockerignore     # Docker ignore file
 ```
+
+## Docker Deployment
+
+### Building the Docker Image
+
+1. Build the Docker image:
+   ```bash
+   docker build -t go-shortener .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -p 8080:8080 \
+     -e AWS_REGION=us-east-1 \
+     -e DYNAMODB_TABLE=url-counter \
+     -e AWS_ACCESS_KEY_ID=your_access_key \
+     -e AWS_SECRET_ACCESS_KEY=your_secret_key \
+     go-shortener
+   ```
+
+### Using Docker Compose
+
+1. Start the application:
+   ```bash
+   docker-compose up
+   ```
+
+2. Stop the application:
+   ```bash
+   docker-compose down
+   ```
+
+### EC2 Deployment
+
+1. Install Docker on EC2:
+   ```bash
+   sudo yum update -y
+   sudo yum install -y docker
+   sudo service docker start
+   sudo usermod -a -G docker ec2-user
+   ```
+
+2. Install Docker Compose:
+   ```bash
+   sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+   sudo chmod +x /usr/local/bin/docker-compose
+   ```
+
+3. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/Go-Shortener.git
+   cd Go-Shortener
+   ```
+
+4. Build and run:
+   ```bash
+   docker-compose up -d
+   ```
 
 ## Setup
 

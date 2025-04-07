@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - AWS_REGION=us-east-1
+      - DYNAMODB_TABLE=url-counter
+    volumes:
+      - .:/app
+    # Add any other environment variables your application needs
+    # - AWS_ACCESS_KEY_ID=your_access_key
+    # - AWS_SECRET_ACCESS_KEY=your_secret_key 
