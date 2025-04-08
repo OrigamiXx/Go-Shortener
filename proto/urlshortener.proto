@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package urlshortener;
+
+option go_package = "github.com/jingy/Go-Shortener/proto";
+
+// URLShortener service definition
+service URLShortener {
+  // CreateShortURL creates a shortened URL from a long URL
+  rpc CreateShortURL(CreateShortURLRequest) returns (CreateShortURLResponse) {}
+  
+  // GetOriginalURL retrieves the original URL from a short code
+  rpc GetOriginalURL(GetOriginalURLRequest) returns (GetOriginalURLResponse) {}
+  
+  // GetURLStats retrieves statistics for a shortened URL
+  rpc GetURLStats(GetURLStatsRequest) returns (GetURLStatsResponse) {}
+}
+
+// CreateShortURLRequest contains the original URL to be shortened
+message CreateShortURLRequest {
+  string url = 1;
+  // Optional: Custom expiration time in seconds
+  int64 expiration_seconds = 2;
+}
+
+// CreateShortURLResponse contains the shortened URL information
+message CreateShortURLResponse {
+  string short_code = 1;
+  string short_url = 2;
+  int64 created_at = 3;
+  int64 expires_at = 4;
+}
+
+// GetOriginalURLRequest contains the short code to look up
+message GetOriginalURLRequest {
+  string short_code = 1;
+}
+
+// GetOriginalURLResponse contains the original URL
+message GetOriginalURLResponse {
+  string original_url = 1;
+  int64 created_at = 2;
+  int64 expires_at = 3;
+}
+
+// GetURLStatsRequest contains the short code to get stats for
+message GetURLStatsRequest {
+  string short_code = 1;
+}
+
+// GetURLStatsResponse contains the URL statistics
+message GetURLStatsResponse {
+  string short_code = 1;
+  int64 total_clicks = 2;
+  int64 unique_visitors = 3;
+  int64 created_at = 4;
+  int64 expires_at = 5;
+  // Map of country code to click count
+  map<string, int64> clicks_by_country = 6;
+  // Map of hour (0-23) to click count
+  map<int32, int64> clicks_by_hour = 7;
+} 

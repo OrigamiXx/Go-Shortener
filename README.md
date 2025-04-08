@@ -208,9 +208,11 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
 
 ## API Endpoints
 
-### Create Short URL
+### REST API
+
+#### Create Short URL
 - Method: POST
-- Path: /create
+- Path: `/create`
 - Request Body:
   ```json
   {
@@ -225,10 +227,74 @@ A serverless URL shortener service built with Go and AWS Lambda. This service us
   }
   ```
 
-### Redirect
+#### Redirect
 - Method: GET
-- Path: /{shortCode}
+- Path: `/{shortCode}`
 - Response: 302 Redirect to original URL
+
+### gRPC API
+
+The service also exposes a gRPC API on port 50051 with the following endpoints:
+
+#### CreateShortURL
+```protobuf
+rpc CreateShortURL(CreateShortURLRequest) returns (CreateShortURLResponse)
+```
+- Creates a shortened URL from a long URL
+- Supports custom expiration time
+- Returns creation and expiration timestamps
+
+#### GetOriginalURL
+```protobuf
+rpc GetOriginalURL(GetOriginalURLRequest) returns (GetOriginalURLResponse)
+```
+- Retrieves the original URL from a short code
+- Returns creation and expiration timestamps
+
+#### GetURLStats
+```protobuf
+rpc GetURLStats(GetURLStatsRequest) returns (GetURLStatsResponse)
+```
+- Retrieves statistics for a shortened URL
+- Includes total clicks, unique visitors
+- Provides geographic and temporal analytics
+
+### gRPC Client Example
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    pb "github.com/jingy/Go-Shortener/proto"
+    "google.golang.org/grpc"
+)
+
+func main() {
+    // Connect to gRPC server
+    conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+    if err != nil {
+        log.Fatalf("Failed to connect: %v", err)
+    }
+    defer conn.Close()
+
+    // Create client
+    client := pb.NewURLShortenerClient(conn)
+    ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+    defer cancel()
+
+    // Create short URL
+    resp, err := client.CreateShortURL(ctx, &pb.CreateShortURLRequest{
+        Url: "https://example.com",
+    })
+    if err != nil {
+        log.Fatalf("Failed to create short URL: %v", err)
+    }
+    log.Printf("Short URL: %s", resp.ShortUrl)
+}
 
 ## Local Development
 
