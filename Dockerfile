@@ -8,7 +8,7 @@ RUN apk add --no-cache git
 WORKDIR /app
 
 # Copy go mod and sum files
-COPY go.mod ./
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
@@ -16,8 +16,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
+# Build both servers
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/grpc-server ./cmd/grpc-server
 
 # Final stage
 FROM alpine:3.19
@@ -31,17 +32,19 @@ RUN adduser -D -g '' appuser
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder
-COPY --from=builder /app/server .
+# Copy built binaries from builder
+COPY --from=builder /app/server /app/server
+COPY --from=builder /app/grpc-server /app/grpc-server
+COPY --from=builder /app/scripts/entrypoint.sh /app/entrypoint.sh
 
-# Copy any necessary config files
-COPY --from=builder /app/template.yaml .
+# Make entrypoint script executable
+RUN chmod +x /app/entrypoint.sh
 
 # Use non-root user
 USER appuser
 
-# Expose port (adjust if your application uses a different port)
-EXPOSE 8080
+# Expose ports for both REST API and gRPC
+EXPOSE 8080 50051
 
-# Run the application
-CMD ["./server"] 
+# Set the entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"] 
